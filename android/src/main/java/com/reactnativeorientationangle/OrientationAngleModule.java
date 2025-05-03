@@ -141,7 +141,7 @@ public class OrientationAngleModule extends ReactContextBaseJavaModule implement
 
 	// Method to calculate the angle difference between two angles
 	private double angleDifference(double prev, double current) {
-		return normalizeAngle(normalizeAngle(prev), normalizeAngle(current));
+		return normalizeAngle(normalizeAngle(prev)- normalizeAngle(current));
 	}
 
 	// Method to filter yaw (you can add similar methods for pitch and roll)
