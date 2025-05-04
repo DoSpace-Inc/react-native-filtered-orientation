@@ -3,6 +3,7 @@
 #import <CoreMotion/CoreMotion.h>
 #import <React/RCTLog.h>
 
+#define RAD_TO_DEG (180.0f / 3.141592653589793f)
 
 @interface OrientationAngle ()
 
@@ -77,55 +78,59 @@ RCT_EXPORT_MODULE();
   [_motionManager stopDeviceMotionUpdates];
 }
 
-// Method to filter angles (like alpha blending)
-- (float)filterAngle:(float)prev current:(float)current {
-    float delta = [self angleDifference:prev current:current];
-    float adjustedCurrent = prev + delta;
-    float filteredAngle = self.alpha * prev + (1 - self.alpha) * adjustedCurrent;
-    return [self normalizeAngle:filteredAngle];
-}
-
 // Normalize angle to the range [-180, 180]
 - (float)normalizeAngle:(float)angle {
-    return fmod((angle + 180), 360) - 180;
-}
-
-// Calculate the angle difference between two angles
-- (float)angleDifference:(float)angle1 current:(float)angle2 {
-    return [self normalizeAngle:([self normalizeAngle:angle2] - [self normalizeAngle:angle1])];
+  while (true) {
+    if (angle > 180) {
+      angle -= 360;
+    } else if (angle < -180) {
+      angle += 360;
+    } else {
+      break;
+    }
+  }
+  return angle;
 }
 
 // Convert quaternion to Euler angles (pitch, roll, yaw)
 - (NSArray *)quaternionToEuler:(CMQuaternion)quaternion {
-    float ysqr = quaternion.y * quaternion.y;
+  float ysqr = quaternion.y * quaternion.y;
 
-    // Pre-calculate values for the Euler angles
-    float t0 = -2.0 * (ysqr + quaternion.z * quaternion.z) + 1.0;
-    float t1 = +2.0 * (quaternion.x * quaternion.y + quaternion.w * quaternion.z);
-    float t2 = -2.0 * (quaternion.x * quaternion.z - quaternion.w * quaternion.y);
-    float t3 = +2.0 * (quaternion.y * quaternion.z + quaternion.w * quaternion.x);
-    float t4 = -2.0 * (quaternion.x * quaternion.x + ysqr) + 1.0;
+  // Pre-calculate values for the Euler angles
+  float t0 = -2.0 * (ysqr + quaternion.z * quaternion.z) + 1.0;
+  float t1 = +2.0 * (quaternion.x * quaternion.y + quaternion.w * quaternion.z);
+  float t2 = -2.0 * (quaternion.x * quaternion.z - quaternion.w * quaternion.y);
+  float t3 = +2.0 * (quaternion.y * quaternion.z + quaternion.w * quaternion.x);
+  float t4 = -2.0 * (quaternion.x * quaternion.x + ysqr) + 1.0;
 
-    // Clamp t2 to avoid NaN in the arcsin function
-    t2 = fminf(1.0, fmaxf(-1.0, t2));
+  // Clamp t2 to avoid NaN in the arcsin function
+  t2 = fminf(1.0, fmaxf(-1.0, t2));
 
-    // Calculate pitch, roll, and yaw
-    float pitch = atan2f(t3, t4) * (180.0 / M_PI) - 90;
-    float roll = asinf(t2) * (180.0 / M_PI);
-    float yaw = -atan2f(t1, t0) * (180.0 / M_PI);
+  // Calculate pitch, roll, and yaw
+  float pitch = atan2f(t3, t4) * RAD_TO_DEG;
+  if (pitch < 0 && fabsf(pitch) > 90.0f) {
+    pitch += 360.0f;
+  }
+  pitch -= 90.0f; // Adjust pitch by -90 to match original code
 
-    // Apply filtering to yaw, pitch, and roll
-    if (_prevPitch < -360) {
-        _prevPitch = pitch;
-        _prevRoll = roll;
-        _prevYaw = yaw;
-    }
+  float roll = asinf(t2) * RAD_TO_DEG;
+  float yaw = -atan2f(t1, t0) * RAD_TO_DEG;
 
-    _prevPitch = [self filterAngle:_prevPitch current:pitch];
-    _prevRoll = [self filterAngle:_prevRoll current:roll];
-    _prevYaw = [self filterAngle:_prevYaw current:yaw];
+  // Initialize previous values if needed
+  if (_prevPitch < -360.0f) {
+    _prevPitch = pitch;
+    _prevRoll = roll;
+    _prevYaw = yaw;
+  }
 
-    return @[@(_prevPitch), @(_prevRoll), @(_prevYaw)];
+  // Apply exponential smoothing
+  _prevPitch += _alpha * (pitch - _prevPitch);
+  _prevRoll += _alpha * (roll - _prevRoll);
+  _prevYaw += _alpha * [self normalizeAngle:(yaw - _prevYaw)];
+  _prevYaw = [self normalizeAngle:_prevYaw];
+
+  // Return values in [pitch, roll, yaw] order
+  return @[ @(_prevPitch), @(_prevRoll), @(_prevYaw) ];
 }
 
 RCT_EXPORT_METHOD(setUpdateInterval : (float)newInterval) {
@@ -145,13 +150,10 @@ RCT_EXPORT_METHOD(getUpdateInterval : (RCTResponseSenderBlock)callback) {
   callback(@[ [NSNumber numberWithFloat:interval] ]);
 }
 
-RCT_EXPORT_METHOD(setAlpha:(float)newAlpha) {
-    self.alpha = newAlpha;
-}
+RCT_EXPORT_METHOD(setAlpha : (float)newAlpha) { self.alpha = newAlpha; }
 
-RCT_EXPORT_METHOD(getAlpha:(RCTResponseSenderBlock)callback) {
-    callback(@[@(self.alpha)]);
+RCT_EXPORT_METHOD(getAlpha : (RCTResponseSenderBlock)callback) {
+  callback(@[ @(self.alpha) ]);
 }
-
 
 @end
