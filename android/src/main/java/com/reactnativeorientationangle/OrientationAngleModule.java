@@ -37,7 +37,7 @@ public class OrientationAngleModule extends ReactContextBaseJavaModule implement
 
 		this.reactContext = reactContext;
 		this.sensorManager = (SensorManager) reactContext.getSystemService(reactContext.SENSOR_SERVICE);
-		this.sensor = this.sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+		this.sensor = this.sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
 	}
 
 	@Override
@@ -118,7 +118,11 @@ public class OrientationAngleModule extends ReactContextBaseJavaModule implement
 		t2 = Math.max(-1.0, Math.min(1.0, t2));
 
 		// Calculate pitch, roll, and yaw
-		double pitch = Math.toDegrees(Math.atan2(t3, t4)) - 90;
+		double pitch = Math.toDegrees(Math.atan2(t3, t4));
+		if (pitch < 0 && Math.abs(pitch) > 90) {
+			pitch += 360;
+		}
+		pitch -= 90; // Adjust pitch by -90 to match original code
 		double roll = Math.toDegrees(Math.asin(t2));
 		double yaw = -Math.toDegrees(Math.atan2(t1, t0));
 		if (prevPitch < -360) {
@@ -126,30 +130,25 @@ public class OrientationAngleModule extends ReactContextBaseJavaModule implement
 			prevRoll = roll;
 			prevYaw = yaw;
 		}
-		prevPitch = filterAngle(prevPitch, pitch);
-		prevRoll = filterAngle(prevRoll, roll);
-		prevYaw = filterAngle(prevYaw, yaw);
-
+		prevPitch += this.alpha * (pitch - prevPitch);
+		prevRoll += this.alpha * (roll - prevRoll);
+		prevYaw += this.alpha * normalizeAngle(yaw - prevYaw);
+		prevYaw = normalizeAngle(prevYaw);
 		// Return in the order of [pitch, roll, yaw]
-		return new double[] { prevPitch, prevRoll, prevYaw }; // Adjust pitch by -90 to match original code
+		return new double[] { prevPitch, prevRoll, prevYaw };
 	}
 
 	// Normalize angle to the range [-180, 180]
 	private double normalizeAngle(double angle) {
-		return (angle + 180) % 360 - 180;
-	}
-
-	// Method to calculate the angle difference between two angles
-	private double angleDifference(double prev, double current) {
-		return normalizeAngle(normalizeAngle(prev)- normalizeAngle(current));
-	}
-
-	// Method to filter yaw (you can add similar methods for pitch and roll)
-	private double filterAngle(double prev, double current) {
-		double delta = angleDifference(prev, current);
-		double adjusted_current = prev + delta;
-		double filtered_angle = this.alpha * prev + (1 - this.alpha) * adjusted_current;
-		return normalizeAngle(filtered_angle);
+		while (true) {
+			if (angle > 180)
+				angle -= 360;
+			else if (angle < -180)
+				angle += 360;
+			else
+				break;
+		}
+		return angle;
 	}
 
 }
