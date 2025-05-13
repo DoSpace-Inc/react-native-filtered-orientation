@@ -1,4 +1,4 @@
-# React Native Orientation Angle
+# React Native Filtered Orientation
 
 [![npm version](https://badge.fury.io/js/react-native-filtered-orientation.svg)](https://badge.fury.io/js/react-native-filtered-orientation)
 
