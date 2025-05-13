@@ -20,7 +20,7 @@
 }
 
 // To export a module named OrientationAngle
-RCT_EXPORT_MODULE(OrientationAngle);
+RCT_EXPORT_MODULE();
 
 - (instancetype)init {
   if (self = [super init]) {
