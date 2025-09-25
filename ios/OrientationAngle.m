@@ -156,4 +156,17 @@ RCT_EXPORT_METHOD(getAlpha : (RCTResponseSenderBlock)callback) {
   callback(@[ @(self.alpha) ]);
 }
 
+// CRITICAL FIX: Add missing methods required by NativeEventEmitter
+RCT_EXPORT_METHOD(addListener:(NSString *)eventName) {
+  // Required by NativeEventEmitter but handled by React Native bridge
+  // Just log for debugging
+  NSLog(@"addListener called for: %@", eventName);
+}
+
+RCT_EXPORT_METHOD(removeListeners:(NSNumber *)count) {
+  // Required by NativeEventEmitter but handled by React Native bridge
+  // Just log for debugging
+  NSLog(@"removeListeners called for count: %@", count);
+}
+
 @end
